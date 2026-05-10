@@ -1,0 +1,66 @@
+#include <iostream>
+#include <vector>
+#include <random>
+#include <iomanip>
+#include "core/types.h"
+#include "core/sorted_array.h"
+#include "baseline/linear_model.h"
+
+using namespace learned_index;
+
+std::vector<KeyValuePair> loadBinaryDataset(const std::string& file);
+
+
+std::vector<KeyValuePair> generateData(size_t size) {
+    std::vector<KeyValuePair> data;
+    std::mt19937 gen(42);
+    std::uniform_int_distribution<Key> dis(0, UINT64_MAX);
+    for (size_t i = 0; i < size; i++) data.emplace_back(dis(gen), i);
+    return data;
+}
+
+int main() {
+    std::cout << "Neural-Enhanced Hybrid Learned Index - Phase 1" << std::endl;
+    std::cout << std::string(60, '=') << std::endl;
+    
+    // Test data
+    //auto data = generateData(10000);
+    auto data = loadBinaryDataset("datasets/synthetic/uniform_100000.bin");
+
+    
+    // Create sorted array
+    SortedArray arr;
+    arr.bulkLoad(data);
+    
+    // Train model
+    std::vector<Key> keys;
+    std::vector<size_t> positions;
+    for (size_t i = 0; i < arr.data().size(); i++) {
+        keys.push_back(arr.data()[i].key);
+        positions.push_back(i);
+    }
+    
+    LinearModel model;
+    model.train(keys, positions);
+    
+    // Test correctness
+    std::cout << "\n=== Correctness Test ===" << std::endl;
+    int correct = 0;
+    for (const auto& kv : arr.data()) {
+        auto result = arr.lookup(kv.key);
+        if (result.found && result.value == kv.value) correct++;
+    }
+    std::cout << "Correct lookups: " << correct << " / " << arr.data().size() << std::endl;
+    std::cout << "Accuracy: " << std::fixed << std::setprecision(1) 
+              << (100.0 * correct / arr.data().size()) << "%" << std::endl;
+    
+    // Model statistics
+    std::cout << "\n=== Model Statistics ===" << std::endl;
+    auto stats = model.getStats(keys, positions);
+    std::cout << "MAE: " << std::fixed << std::setprecision(2) 
+              << stats.mean_absolute_error << std::endl;
+    std::cout << "Max Error: " << stats.max_error << std::endl;
+    
+    std::cout << "\n=== Test Complete ===" << std::endl;
+    return 0;
+}
